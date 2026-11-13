@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-integrahub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-integrahub}
+      POSTGRES_DB: ${POSTGRES_DB:-integrahub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Bound to localhost only: handy for inspecting the data, not exposed to the network.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-true}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-integrahub}:${POSTGRES_PASSWORD:-integrahub}@db:5432/${POSTGRES_DB:-integrahub}
+      API_KEY: ${API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-0}
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
